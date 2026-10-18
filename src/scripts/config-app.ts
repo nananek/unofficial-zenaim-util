@@ -3,6 +3,7 @@ import { renderDeviceInfo } from '../lib/ui/deviceInfo';
 import { clear, h, type Child } from '../lib/ui/dom';
 import { applyI18n, getLang, onLangChange, t } from '../lib/ui/i18n';
 import type { ActuationPoint, Backup, RgbLedConfig } from '../lib/protocol/client';
+import type { DeviceProperty } from '../lib/protocol/deviceProperties';
 import {
   LIGHTING_INDICATORS,
   LIGHTING_MODE_LABELS,
@@ -11,6 +12,7 @@ import {
   PROFILE_COUNT,
   PROFILE_LABELS,
 } from '../lib/protocol/enums';
+import { deviceKeyNames } from '../lib/protocol/keyLayout';
 
 type Tab = 'connect' | 'actuation' | 'lighting' | 'backup';
 
@@ -322,24 +324,34 @@ function renderActuation(): HTMLElement {
   return h('div', { class: 'card' }, ...body) as HTMLElement;
 }
 
+/** Grid cell label for a device index: the key name when known, else `#NN`. */
+function cellLabel(property: DeviceProperty, index: number, name: string | null, value: number): string {
+  const row = Math.floor(index / property.columns) + 1;
+  const column = (index % property.columns) + 1;
+  return name === null
+    ? t('actuation.cellTitle', { index: index + 1, row, column, value })
+    : t('actuation.cellTitleNamed', { name, row, column, value });
+}
+
 function renderKeyGrid(): HTMLElement {
   const property = connected()?.identity.property;
   if (!property) return h('div');
+  const names = deviceKeyNames(property);
   const grid = h('div', {
     class: 'key-grid',
     style: { gridTemplateColumns: `repeat(${property.columns}, minmax(0, 1fr))` },
   });
   state.apPoints.forEach((point, index) => {
-    const row = Math.floor(index / property.columns) + 1;
-    const column = (index % property.columns) + 1;
+    const name = names?.[index] ?? null;
+    const title = cellLabel(property, index, name, point.pointOn);
     grid.append(
       h('button', {
         type: 'button',
         class: `key-cell${state.apSelected === index ? ' is-selected' : ''}`,
         dataset: { index: String(index) },
-        title: t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn }),
-        'aria-label': t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn }),
-        text: `#${String(index + 1).padStart(2, '0')}`,
+        title,
+        'aria-label': title,
+        text: name ?? `#${String(index + 1).padStart(2, '0')}`,
         style: { backgroundColor: thresholdColor(point.pointOn, property.actuationDistance) },
         onclick: () => {
           state.apSelected = index;
@@ -357,9 +369,8 @@ function refreshCell(index: number): void {
   if (!property || !point) return;
   const cell = root.querySelector<HTMLElement>(`.key-cell[data-index="${index}"]`);
   if (!cell) return;
-  const row = Math.floor(index / property.columns) + 1;
-  const column = (index % property.columns) + 1;
-  cell.title = t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn });
+  const name = deviceKeyNames(property)?.[index] ?? null;
+  cell.title = cellLabel(property, index, name, point.pointOn);
   cell.setAttribute('aria-label', cell.title);
   cell.style.backgroundColor = thresholdColor(point.pointOn, property.actuationDistance);
 }
@@ -374,14 +385,15 @@ function renderPointEditor(): HTMLElement {
   const max = property.actuationDistance;
   const row = Math.floor(index / property.columns) + 1;
   const column = (index % property.columns) + 1;
+  const name = deviceKeyNames(property)?.[index] ?? null;
   return h(
     'div',
     null,
     h('div', { class: 'selected-key-card' },
       h('span', { class: 'selected-key-id', text: `#${String(index + 1).padStart(2, '0')}` }),
       h('div', null,
-        h('strong', { text: t('actuation.position', { row, column }) }),
-        h('span', { class: 'small muted', text: t('actuation.noKeymap') }),
+        h('strong', { text: name ?? t('actuation.noKeyName') }),
+        h('span', { class: 'small muted', text: t('actuation.position', { row, column }) }),
       ),
     ),
     pointField(t('actuation.pointOn'), point.pointOn, max, (value) => {
