@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="WebHID コンフィギュレータ — ZENAIM KEYBOARD"
+  description="Read and write actuation points, lighting and LED settings on the ZENAIM KEYBOARD from your browser over WebHID."
+  active="config"
+>
+  <h1 data-i18n="config.title"></h1>
+  <p class="small muted" data-i18n="index.scope.body"></p>
+  <div id="config-root"></div>
+  <div id="overlay-slot"></div>
+</BaseLayout>
+
+<script>
+  import '../scripts/config-app';
+</script>
