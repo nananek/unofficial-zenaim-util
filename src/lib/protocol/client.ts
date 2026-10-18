@@ -29,6 +29,14 @@ export interface ActuationPoint {
   pointOff: number;
 }
 
+/** One live press-depth sample (§3.20). Read-only. */
+export interface ActuationDepth {
+  /** Current travel in µm; signed 14-bit on the wire. */
+  distance: number;
+  /** True while the key is held past its switch point. */
+  switchState: boolean;
+}
+
 export interface RgbLedConfig {
   enable: boolean;
   /** 0..255, as stored by the device. */
@@ -152,6 +160,17 @@ export function encodeActuationPoints(points: readonly ActuationPoint[]): Uint8A
     writeU16LE(out, i * 4 + 2, point.pointOff);
   });
   return out;
+}
+
+/**
+ * One 2-byte §3.20 sample: bit15 = sign, bit14 = switch state, bits13..0 =
+ * magnitude (negative distances are stored as `0x4000 + distance`).
+ */
+export function parseActuationDepth(low: number, high: number): ActuationDepth {
+  const switchState = (high & 0x40) !== 0;
+  const magnitude = ((high & 0x3f) << 8) | low;
+  const distance = (high & 0x80) !== 0 ? magnitude - 0x4000 : magnitude;
+  return { distance, switchState };
 }
 
 export function readLightingMode(params: Uint8Array): number {
@@ -355,6 +374,24 @@ export class ZaneimClient {
     await this.actuationPointSave();
     const readBack = await this.actuationPointsGet(profile, property);
     return compareActuationPoints(points, readBack);
+  }
+
+  /* ---------------------------------------------- §3.20 live press depth */
+
+  /**
+   * Read-only live sample of every key: ActuationDistanceWithSwitchStateAllGet
+   * returns `keyCount × 2` bytes (one signed 14-bit distance + switch state per
+   * key), decoded 2 bytes at a time. This is what the configurator's live
+   * monitor polls; it never writes to the device.
+   */
+  async actuationDepthsGet(property: DeviceProperty): Promise<ActuationDepth[]> {
+    const size = property.keyCount * 2;
+    const buffer = await this.getBuffer(Cmd.ActuationDistanceWithSwitchStateAllGet, 0, size);
+    const depths: ActuationDepth[] = [];
+    for (let i = 0; i + 2 <= buffer.length; i += 2) {
+      depths.push(parseActuationDepth(buffer[i] ?? 0, buffer[i + 1] ?? 0));
+    }
+    return depths;
   }
 
   /* ------------------------------------------------------ §3.10 lighting */

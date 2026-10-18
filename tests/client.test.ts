@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Cmd } from '../src/lib/protocol/commands';
 import { ZENAIM_VENDOR_ID, pickDeviceProperty } from '../src/lib/protocol/deviceProperties';
 import { MockDevice, MockTransport } from '../src/lib/protocol/mockDevice';
-import { ZaneimClient, type ActuationPoint } from '../src/lib/protocol/client';
+import { ZaneimClient, parseActuationDepth, type ActuationPoint } from '../src/lib/protocol/client';
 import {
   DeviceErrorResponse,
   ProtocolError,
@@ -122,6 +122,50 @@ describe('actuation point write sequence (§6.1)', () => {
     const result = await client.writeActuationPoints(0, samplePoints(property80.keyCount), property80);
     expect(result.ok).toBe(false);
     expect(result.mismatches.length).toBeGreaterThan(0);
+  });
+});
+
+describe('actuation depth samples (0xCB, read-only)', () => {
+  it('parses the signed 14-bit distance and the switch bit', () => {
+    // bit15 = sign, bit14 = switch state, bits13..0 = magnitude.
+    expect(parseActuationDepth(0xe8, 0x03)).toEqual({ distance: 1000, switchState: false });
+    expect(parseActuationDepth(0xc7, 0xbf)).toEqual({ distance: -57, switchState: false });
+    expect(parseActuationDepth(0xf4, 0x41)).toEqual({ distance: 500, switchState: true });
+    expect(parseActuationDepth(0x00, 0x00)).toEqual({ distance: 0, switchState: false });
+    expect(parseActuationDepth(0xf2, 0x47)).toEqual({ distance: 2034, switchState: true });
+    // Boundaries: magnitude spans 0..0x3FFF; with the sign bit set the value is
+    // magnitude - 0x4000 (-0x4000..-1).
+    expect(parseActuationDepth(0xff, 0x3f)).toEqual({ distance: 16383, switchState: false });
+    expect(parseActuationDepth(0x00, 0x80)).toEqual({ distance: -16384, switchState: false });
+  });
+
+  it('stays idle (all zero) until samples are set', async () => {
+    const { client } = setup();
+    const samples = await client.actuationDepthsGet(property80);
+    expect(samples).toHaveLength(property80.keyCount);
+    expect(samples.every((sample) => sample.distance === 0 && !sample.switchState)).toBe(true);
+  });
+
+  it('round-trips samples through the mock device in 108-key blocks', async () => {
+    const { client, device, transport } = setup();
+    const samples = [
+      { distance: 0, switchState: false },
+      { distance: 1000, switchState: false },
+      { distance: -57, switchState: false },
+      { distance: 500, switchState: true },
+      { distance: 2034, switchState: true },
+    ];
+    device.setActuationDepths(samples);
+    const read = await client.actuationDepthsGet(property80);
+    expect(read).toHaveLength(108);
+    expect(read.slice(0, samples.length)).toEqual(samples);
+    // Keys without a sample read back as idle.
+    expect(read[property80.keyCount - 1]).toEqual({ distance: 0, switchState: false });
+    // 216 bytes are fetched as ceil(216 / 26) = 9 chunks.
+    const frames = transport.sentFrames.filter(
+      (frame) => frame[0] === Cmd.ActuationDistanceWithSwitchStateAllGet,
+    );
+    expect(frames).toHaveLength(9);
   });
 });
 

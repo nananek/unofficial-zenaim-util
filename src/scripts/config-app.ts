@@ -2,7 +2,7 @@ import { Connection, connectionStatus, describeError } from '../lib/ui/connectio
 import { renderDeviceInfo } from '../lib/ui/deviceInfo';
 import { clear, h, type Child } from '../lib/ui/dom';
 import { applyI18n, getLang, onLangChange, t } from '../lib/ui/i18n';
-import type { ActuationPoint, Backup, RgbLedConfig } from '../lib/protocol/client';
+import type { ActuationDepth, ActuationPoint, Backup, RgbLedConfig } from '../lib/protocol/client';
 import type { DeviceProperty } from '../lib/protocol/deviceProperties';
 import {
   LIGHTING_INDICATORS,
@@ -31,6 +31,8 @@ interface AppState {
   apSelected: number | null;
   apEnabled: boolean;
   apDirty: boolean;
+  live: boolean;
+  liveRateHz: number;
   ledLoaded: boolean;
   led: RgbLedConfig;
   ltLoaded: boolean;
@@ -49,6 +51,8 @@ const state: AppState = {
   apSelected: null,
   apEnabled: true,
   apDirty: false,
+  live: false,
+  liveRateHz: 0,
   ledLoaded: false,
   led: { enable: true, brightness: 128 },
   ltLoaded: false,
@@ -133,6 +137,7 @@ function renderTabs(): HTMLElement {
         'aria-selected': String(state.tab === tab.id),
         text: t(tab.key),
         onclick: () => {
+          stopLiveMonitor();
           state.tab = tab.id;
           state.notice = null;
           render();
@@ -286,6 +291,7 @@ function renderActuation(): HTMLElement {
           ),
           h('span', { class: 'badge', text: t('actuation.keyCount', { count: state.apPoints.length }) }),
         ),
+        renderLiveBar(),
         renderKeyGrid(),
         h('p', { class: 'keymap-footnote', text: t('actuation.mappingNote') }),
       ),
@@ -331,6 +337,27 @@ function cellLabel(property: DeviceProperty, index: number, name: string | null,
   return name === null
     ? t('actuation.cellTitle', { index: index + 1, row, column, value })
     : t('actuation.cellTitleNamed', { name, row, column, value });
+}
+
+/** Live monitor controls shown between the grid heading and the key grid. */
+function renderLiveBar(): HTMLElement {
+  return h(
+    'div',
+    { class: `live-bar${state.live ? ' is-live' : ''}` },
+    h('button', {
+      type: 'button',
+      class: `live-toggle${state.live ? '' : ' primary'}`,
+      'aria-pressed': String(state.live),
+      text: t(state.live ? 'actuation.live.stop' : 'actuation.live.start'),
+      disabled: state.busy !== null,
+      onclick: toggleLiveMonitor,
+    }),
+    h('span', {
+      class: 'live-rate',
+      text: state.live ? t('actuation.live.rate', { hz: Math.round(state.liveRateHz) }) : '',
+    }),
+    h('span', { class: 'small muted live-hint', text: t('actuation.live.hint') }),
+  );
 }
 
 function renderKeyGrid(): HTMLElement {
@@ -396,17 +423,80 @@ function renderPointEditor(): HTMLElement {
         h('span', { class: 'small muted', text: t('actuation.position', { row, column }) }),
       ),
     ),
+    renderDepthBar(index),
     pointField(t('actuation.pointOn'), point.pointOn, max, (value) => {
       point.pointOn = value;
       state.apDirty = true;
       refreshCell(index);
+      refreshDepthBar();
     }),
     pointField(t('actuation.pointOff'), point.pointOff, max, (value) => {
       point.pointOff = value;
       state.apDirty = true;
       refreshCell(index);
+      refreshDepthBar();
     }),
   );
+}
+
+/**
+ * Depth bar for the selected key: the fill tracks the live press sample and
+ * the dashed lines mark the configured press/release thresholds.
+ */
+function renderDepthBar(index: number): HTMLElement {
+  const property = connected()?.identity.property;
+  const point = state.apPoints[index];
+  const max = property?.actuationDistance ?? 0;
+  return h(
+    'div',
+    { class: 'depth-bar' },
+    h('div', { class: 'depth-track' },
+      h('div', { class: 'depth-fill' }),
+      h('div', {
+        class: 'depth-marker is-on',
+        title: t('actuation.live.markerOn'),
+        style: { bottom: `${percentOf(point?.pointOn ?? 0, max)}%` },
+      }),
+      h('div', {
+        class: 'depth-marker is-off',
+        title: t('actuation.live.markerOff'),
+        style: { bottom: `${percentOf(point?.pointOff ?? 0, max)}%` },
+      }),
+    ),
+    h('div', { class: 'depth-readout' },
+      h('span', { class: 'depth-value', text: t('actuation.live.depth', { value: 0 }) }),
+      h('span', { class: 'depth-legend' },
+        h('span', { class: 'is-on', text: t('actuation.live.markerOn') }),
+        h('span', { class: 'is-off', text: t('actuation.live.markerOff') }),
+      ),
+    ),
+  );
+}
+
+/**
+ * Repaint the selected-key depth bar: threshold markers from the loaded
+ * points, fill and readout from the newest live sample (idle while the
+ * monitor is stopped).
+ */
+function refreshDepthBar(): void {
+  const bar = root.querySelector<HTMLElement>('.depth-bar');
+  if (!bar) return;
+  const property = connected()?.identity.property;
+  const index = state.apSelected;
+  const point = index === null ? undefined : state.apPoints[index];
+  const max = property?.actuationDistance ?? 0;
+  if (point) {
+    const on = bar.querySelector<HTMLElement>('.depth-marker.is-on');
+    const off = bar.querySelector<HTMLElement>('.depth-marker.is-off');
+    if (on) on.style.bottom = `${percentOf(point.pointOn, max)}%`;
+    if (off) off.style.bottom = `${percentOf(point.pointOff, max)}%`;
+  }
+  const sample = state.live && index !== null ? liveDepths[index] : undefined;
+  const fill = bar.querySelector<HTMLElement>('.depth-fill');
+  if (fill) fill.style.height = `${percentOf(sample?.distance ?? 0, max)}%`;
+  const value = bar.querySelector<HTMLElement>('.depth-value');
+  if (value) value.textContent = t('actuation.live.depth', { value: Math.round(sample?.distance ?? 0) });
+  bar.classList.toggle('is-pressed', Boolean(sample?.switchState));
 }
 
 function pointField(
@@ -438,6 +528,128 @@ function pointField(
     h('label', { text: label }),
     h('div', { class: 'field-row' }, range, number, h('span', { class: 'small muted', text: t('actuation.unit') })),
   );
+}
+
+/* ------------------------------------- live monitor (§3.20, read-only) */
+
+const LIVE_FAILURE_LIMIT = 3;
+const LIVE_RATE_WINDOW_MS = 500;
+const LIVE_BUSY_RETRY_MS = 100;
+
+/** Monotonic run token: bumping it makes a running loop exit on its next check. */
+let liveToken = 0;
+/** Newest samples from the current run, used by the depth bar. */
+let liveDepths: readonly ActuationDepth[] = [];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Value as a 0..100 percentage of the full travel, clamped. */
+function percentOf(value: number, max: number): string {
+  const ratio = max > 0 ? value / max : 0;
+  return (Math.max(0, Math.min(1, ratio)) * 100).toFixed(1);
+}
+
+/**
+ * Poll ActuationDistanceWithSwitchStateAllGet (0xCB) until the token changes.
+ * This path only reads: cycles are skipped while another operation (a write)
+ * is in flight, and three consecutive failures stop the monitor.
+ */
+async function runLiveMonitor(token: number): Promise<void> {
+  const snapshot = connected();
+  const property = snapshot?.identity.property;
+  if (!snapshot || !property) return;
+  let failures = 0;
+  let windowStart = Date.now();
+  let windowPolls = 0;
+  while (token === liveToken) {
+    if (state.busy !== null) {
+      // A write is in flight; pause polling and start a fresh rate window.
+      await sleep(LIVE_BUSY_RETRY_MS);
+      windowStart = Date.now();
+      windowPolls = 0;
+      continue;
+    }
+    try {
+      const depths = await snapshot.client.actuationDepthsGet(property);
+      if (token !== liveToken) return;
+      failures = 0;
+      windowPolls += 1;
+      applyLiveDepths(depths, property.actuationDistance);
+      const now = Date.now();
+      if (now - windowStart >= LIVE_RATE_WINDOW_MS) {
+        state.liveRateHz = (windowPolls * 1000) / (now - windowStart);
+        windowStart = now;
+        windowPolls = 0;
+        updateLiveRateLabel();
+      }
+    } catch (error) {
+      if (token !== liveToken) return;
+      failures += 1;
+      if (failures >= LIVE_FAILURE_LIMIT) {
+        stopLiveMonitor();
+        state.notice = {
+          kind: 'error',
+          text: t('actuation.live.stoppedError', { count: failures, message: describeError(error) }),
+        };
+        render();
+        return;
+      }
+    }
+  }
+}
+
+/** Paint the newest samples onto the grid in place (no re-render). */
+function applyLiveDepths(depths: readonly ActuationDepth[], max: number): void {
+  liveDepths = depths;
+  root.querySelectorAll<HTMLElement>('.key-cell[data-index]').forEach((cell) => {
+    const sample = depths[Number(cell.dataset.index)];
+    if (!sample) return;
+    cell.classList.add('is-live');
+    cell.style.setProperty('--depth', percentOf(sample.distance, max));
+  });
+  refreshDepthBar();
+}
+
+function updateLiveRateLabel(): void {
+  const label = root.querySelector<HTMLElement>('.live-rate');
+  if (label) label.textContent = t('actuation.live.rate', { hz: Math.round(state.liveRateHz) });
+}
+
+function startLiveMonitor(): void {
+  if (state.live || !connected()?.identity.property) return;
+  state.live = true;
+  state.liveRateHz = 0;
+  const token = ++liveToken;
+  render();
+  void runLiveMonitor(token);
+}
+
+/**
+ * Stop polling and drop every live-only decoration; the grid returns to its
+ * actuation-point colours. Safe to call at any time.
+ */
+function stopLiveMonitor(): void {
+  if (!state.live) return;
+  state.live = false;
+  liveToken += 1;
+  liveDepths = [];
+  state.liveRateHz = 0;
+  root.querySelectorAll<HTMLElement>('.key-cell.is-live').forEach((cell) => {
+    cell.classList.remove('is-live');
+    cell.style.removeProperty('--depth');
+  });
+  refreshDepthBar();
+}
+
+function toggleLiveMonitor(): void {
+  if (state.live) {
+    stopLiveMonitor();
+    render();
+  } else {
+    startLiveMonitor();
+  }
 }
 
 async function loadActuation(profile: number): Promise<void> {
@@ -837,11 +1049,13 @@ function render(): void {
       root.append(renderConnectPanel());
   }
   renderOverlay();
+  refreshDepthBar();
 }
 
 connection.subscribe((snapshot) => {
   state.notice = null;
   if (snapshot.kind !== 'connected') {
+    stopLiveMonitor();
     state.apLoaded = false;
     state.ledLoaded = false;
     state.ltLoaded = false;

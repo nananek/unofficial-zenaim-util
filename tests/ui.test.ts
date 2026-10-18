@@ -47,6 +47,7 @@ describe('configurator UI (demo mode)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('renders the connection tab and lists all tabs', () => {
@@ -146,5 +147,54 @@ describe('configurator UI (demo mode)', () => {
   it('asks for a connection before showing device tabs', () => {
     button('Actuation').click();
     expect(document.querySelector('#config-root .notice')?.textContent).toContain('Connect a device first');
+  });
+
+  it('paints live press depths onto the grid and clears them on stop', async () => {
+    // Capture the demo device so the test can act as "a key is being held".
+    const { MockDevice } = await import('../src/lib/protocol/mockDevice');
+    type MockDeviceInstance = InstanceType<typeof MockDevice>;
+    const captured: { device: MockDeviceInstance | null } = { device: null };
+    const originalHandle = MockDevice.prototype.handle;
+    vi.spyOn(MockDevice.prototype, 'handle').mockImplementation(function (
+      this: MockDeviceInstance,
+      frame: Uint8Array,
+    ): number[] {
+      captured.device = this;
+      return originalHandle.call(this, frame);
+    });
+
+    button('Try demo mode').click();
+    await waitFor(() => document.querySelector('#device-info'));
+    button('Actuation').click();
+    button('Load').click();
+    await waitFor(() => (document.querySelectorAll('.key-cell').length === 108 ? true : null));
+
+    expect(captured.device).not.toBeNull();
+    captured.device!.setActuationDepths(
+      Array.from({ length: 108 }, (_, index) => ({
+        distance: index === 5 ? 900 : 0,
+        switchState: index === 5,
+      })),
+    );
+
+    button('Start live monitor').click();
+    const cell = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>('.key-cell[data-index="5"]');
+      return element?.classList.contains('is-live') ? element : null;
+    });
+    // 900 µm of the 1800 µm travel → 50 %.
+    expect(Number.parseFloat(cell.style.getPropertyValue('--depth'))).toBeCloseTo(50);
+
+    const rate = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>('.live-rate');
+      return Number.parseFloat(element?.textContent ?? '') > 0 ? element : null;
+    }, 5000);
+    expect(rate.textContent).toContain('Hz');
+
+    button('Stop live monitor').click();
+    expect(document.querySelectorAll('.key-cell.is-live')).toHaveLength(0);
+    // A poll that was in flight at stop time must not repaint the grid.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(document.querySelectorAll('.key-cell.is-live')).toHaveLength(0);
   });
 });

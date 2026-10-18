@@ -138,6 +138,15 @@ const messages: Record<Lang, Record<string, string>> = {
     'actuation.unit': 'µm',
     'actuation.hint': '色は押下しきい値の大きさを示します (青 = 浅い / 赤 = 深い)。',
     'actuation.dirty': '未書き込みの変更があります。',
+    'actuation.live.start': 'ライブモニター開始',
+    'actuation.live.stop': 'ライブモニター停止',
+    'actuation.live.rate': '{hz} Hz',
+    'actuation.live.hint': '押鍵に合わせて押下量を表示します (読み取り専用、書き込み中は一時停止)。',
+    'actuation.live.stoppedError':
+      '読み取りに {count} 回続けて失敗したため、ライブモニターを停止しました: {message}',
+    'actuation.live.depth': '{value} µm',
+    'actuation.live.markerOn': '押下しきい値',
+    'actuation.live.markerOff': '解放しきい値',
 
     'lighting.title': 'ライティング',
     'lighting.led': 'LED 全体設定',
@@ -313,6 +322,15 @@ const messages: Record<Lang, Record<string, string>> = {
     'actuation.unit': 'µm',
     'actuation.hint': 'Colour encodes the press threshold (blue = shallow, red = deep).',
     'actuation.dirty': 'There are unsaved changes.',
+    'actuation.live.start': 'Start live monitor',
+    'actuation.live.stop': 'Stop live monitor',
+    'actuation.live.rate': '{hz} Hz',
+    'actuation.live.hint': 'Shows press depth while you type (read-only; pauses during writes).',
+    'actuation.live.stoppedError':
+      'Live monitor stopped after {count} consecutive read failures: {message}',
+    'actuation.live.depth': '{value} µm',
+    'actuation.live.markerOn': 'Press threshold',
+    'actuation.live.markerOff': 'Release threshold',
 
     'lighting.title': 'Lighting',
     'lighting.led': 'LED master settings',

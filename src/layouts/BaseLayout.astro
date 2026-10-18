@@ -520,6 +520,7 @@ const docsHref = 'https://github.com/nananek/unofficial-zenaim-util/blob/main/do
   }
 
   .key-cell {
+    position: relative;
     aspect-ratio: 1.15 / 1;
     min-width: 0;
     overflow: hidden;
@@ -544,6 +545,19 @@ const docsHref = 'https://github.com/nananek/unofficial-zenaim-util/blob/main/do
   }
 
   .key-cell:hover:not(:disabled) { filter: brightness(1.18); transform: translateY(-1px); }
+
+  /* Live monitor: press depth as a bottom-up translucent fill. `--depth` is a
+     0..100 number set per cell by config-app while the monitor runs. */
+  .key-cell.is-live::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--depth, 0) * 1%);
+    background: rgba(255, 255, 255, 0.5);
+    pointer-events: none;
+  }
 
   .site-footer {
     border-top: 1px solid var(--border);
@@ -615,6 +629,30 @@ const docsHref = 'https://github.com/nananek/unofficial-zenaim-util/blob/main/do
   .editor-panel input[type="range"] { flex: 1 1 100%; }
   .actuation-actions { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
   .save-button { min-width: 13rem; }
+
+  /* ------------------------------------------- live monitor (read-only) */
+
+  .live-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.85rem; }
+  .live-bar .live-rate { min-width: 4rem; font: 600 0.78rem var(--mono); color: var(--muted); }
+  .live-bar.is-live .live-rate { color: var(--accent); }
+  .live-bar.is-live .live-toggle { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  .live-hint { margin-left: auto; text-align: right; }
+
+  .depth-bar { display: flex; flex-direction: column; gap: 0.45rem; margin: 0 0 1.35rem; }
+  .depth-track { position: relative; height: 3.4rem; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--bg) 55%, var(--panel)); overflow: hidden; }
+  .depth-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .depth-bar.is-pressed .depth-fill { background: color-mix(in srgb, var(--accent) 75%, transparent); }
+  .depth-marker { position: absolute; left: 0; right: 0; border-top: 2px dashed; pointer-events: none; }
+  .depth-marker.is-on { border-color: var(--warn); }
+  .depth-marker.is-off { border-color: var(--ok); }
+  .depth-readout { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .depth-value { font: 600 0.82rem var(--mono); }
+  .depth-legend { display: flex; gap: 0.75rem; font-size: 0.72rem; color: var(--muted); }
+  .depth-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .depth-legend span::before { content: ""; width: 0.8rem; border-top: 2px dashed currentColor; }
+  .depth-legend .is-on { color: var(--warn); }
+  .depth-legend .is-off { color: var(--ok); }
+
   .status { margin-top: 0.75rem; }
   .site-footer { margin-top: 2rem; }
 

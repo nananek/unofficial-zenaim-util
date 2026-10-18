@@ -43,6 +43,10 @@ hardware**. Everything else is out of scope for this MVP:
 Unverified command families (keymap, macro, SOCD, MotionHack, …) are intentionally not
 implemented. Always take a backup before writing.
 
+The actuation tab also offers a read-only live monitor: while it runs, the configurator polls
+each key's press depth and switch state (`ActuationDistanceWithSwitchStateAllGet`, 0xCB) and
+paints the values onto the key grid. No writes are involved.
+
 The actuation grid shows key names on the ZK1 80US series (KB007 / KB011); other series keep
 the matrix position labels.
 
@@ -101,6 +105,9 @@ WebHID コンフィギュレータは Astro 製の静的サイトで、GitHub Ac
 UI は日本語 / 英語の切り替えに対応しています。
 
 アクチュエーショングリッドは ZK1 80US (KB007 / KB011) ではキー名、他のシリーズではマトリクス位置 (#NN) を表示します。
+
+アクチュエーションタブには読み取り専用のライブモニターがあります。実行中は各キーの押下量と
+スイッチ状態 (0xcb) をポーリングし、キーグリッドに表示します。書き込みは行いません。
 
 ## License
 

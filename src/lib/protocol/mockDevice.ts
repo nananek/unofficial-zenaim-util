@@ -1,4 +1,5 @@
 import { encodeCString } from './bytes';
+import type { ActuationDepth } from './client';
 import { Cmd } from './commands';
 import { ZENAIM_VENDOR_ID, type DeviceProperty } from './deviceProperties';
 import { LIGHTING_PARAMS_SIZE, PROFILE_COUNT } from './enums';
@@ -15,6 +16,18 @@ export interface MockDeviceOptions {
   initialActuationPoint?: { pointOn: number; pointOff: number };
   actuationEnable?: boolean;
   rgbLedConfig?: { enable: boolean; brightness: number };
+}
+
+/**
+ * Inverse of `parseActuationDepth` (§3.20): bit15 = sign, bit14 = switch
+ * state, bits13..0 = magnitude, with negative distances stored as
+ * `0x4000 + distance`.
+ */
+function encodeActuationDepth(depth: ActuationDepth): [number, number] {
+  const sign = depth.distance < 0;
+  const magnitude = sign ? depth.distance + 0x4000 : depth.distance;
+  const raw = (sign ? 0x8000 : 0) | (depth.switchState ? 0x4000 : 0) | (magnitude & 0x3fff);
+  return [raw & 0xff, (raw >> 8) & 0xff];
 }
 
 /**
@@ -35,6 +48,8 @@ export class MockDevice {
   private apSaved: Uint8Array;
   readonly lighting: Uint8Array;
   readonly ledConfig = new Uint8Array(128);
+  /** Live press samples (§3.20), `keyCount × 2` bytes; all zero means idle. */
+  readonly actuationDepths: Uint8Array;
   actuationEnable: boolean;
   profileSelect = 0;
 
@@ -57,6 +72,8 @@ export class MockDevice {
     this.apStaged = this.apApplied.slice();
     this.apSaved = this.apApplied.slice();
 
+    this.actuationDepths = new Uint8Array(property.keyCount * 2);
+
     this.lighting = new Uint8Array(PROFILE_COUNT * LIGHTING_PARAMS_SIZE);
     this.ledConfig[0] = options.rgbLedConfig?.enable === false ? 0 : 1;
     this.ledConfig[1] = options.rgbLedConfig?.brightness ?? 128;
@@ -66,6 +83,20 @@ export class MockDevice {
   /** Values that survived a Save (used by tests to prove persistence). */
   get persistedActuationPoints(): Uint8Array {
     return this.apSaved.slice();
+  }
+
+  /**
+   * Replace the live press samples; the mock's synthetic input. Entries beyond
+   * the list read back as idle (0 µm, released).
+   */
+  setActuationDepths(samples: readonly ActuationDepth[]): void {
+    this.actuationDepths.fill(0);
+    const count = Math.min(samples.length, this.property.keyCount);
+    for (let i = 0; i < count; i++) {
+      const [low, high] = encodeActuationDepth(samples[i]!);
+      this.actuationDepths[i * 2] = low;
+      this.actuationDepths[i * 2 + 1] = high;
+    }
   }
 
   private keyboardInfoBuffer(): Uint8Array {
@@ -124,6 +155,9 @@ export class MockDevice {
       case Cmd.ActuationPointSave:
         this.apSaved.set(this.apApplied);
         return [id];
+
+      case Cmd.ActuationDistanceWithSwitchStateAllGet:
+        return this.readBack(frame, this.actuationDepths);
 
       case Cmd.RGBLightingGet:
         return this.readBack(frame, this.lighting);
