@@ -8,19 +8,22 @@ Unofficial, community-made utilities for the **ZENAIM KEYBOARD** (KB007 / KB011 
 > No vendor binaries (applications, firmware images, extracted code) are distributed in
 > this repository.
 
-## Planned contents
+## Contents
 
+- **[Protocol documentation](docs/protocol.md)** — the host HID protocol (protocol v2), written
+  from scratch, based on observed behavior of the device interface.
+- **[Hardware notes](docs/hardware.md)** — MCU, peripheral buses, key-scan engine and firmware
+  recovery, based on static analysis of the official firmware.
 - **WebHID configurator** — configure the keyboard from a browser (Windows / macOS / Linux),
-  no installation required.
-- **Protocol and hardware documentation** — written from scratch, based on observed
-  behavior of the device interface.
+  no installation required. (planned)
 
-Status: **WIP** — nothing functional yet.
+Status: **Docs available / configurator WIP**
 
 ## 日本語
 
-公式ファームウェアのまま使える、非公式のツール群です。予定内容は WebHID コンフィギュレータ
-(ブラウザからの設定変更) と、デバイスのプロトコル・ハードウェア仕様のドキュメントです。
+公式ファームウェアのまま使える、非公式のツール群です。内容はデバイスのプロトコル・
+ハードウェア仕様のドキュメント (公開済み) と、WebHID コンフィギュレータ
+(ブラウザからの設定変更、開発中) です。
 
 本リポジトリは非公式・非提携であり、ベンダーのコードやバイナリ (アプリケーション・
 ファームウェアイメージ・抽出物) は一切含めません。
