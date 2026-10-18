@@ -64,19 +64,6 @@ export function clear(node: Node): void {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
-/** Create a detached document fragment from a list of children. */
-export function fragment(...children: Child[]): DocumentFragment {
-  const frag = document.createDocumentFragment();
-  appendChildren(frag, children);
-  return frag;
-}
-
-export function formatBytes(bytes: ArrayLike<number>, start: number, count: number): string {
-  return Array.from({ length: count }, (_, i) =>
-    (bytes[start + i] ?? 0).toString(16).padStart(2, '0'),
-  ).join(' ');
-}
-
 export function toHex(value: number, width = 2): string {
   return value.toString(16).padStart(width, '0');
 }

@@ -1,7 +1,6 @@
 /** Protocol enumerations and their display labels (docs/protocol.md §4). */
 
 export const PROFILE_COUNT = 5;
-export const LAYER_COUNT = 3;
 
 export const Profile = {
   Base: 0,

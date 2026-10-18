@@ -52,9 +52,13 @@ Requirements: a WebHID-capable Chromium browser (Chrome / Edge / Opera) on an HT
 npm install
 npm run dev        # http://localhost:4321/unofficial-zenaim-util/
 npm run build      # static output in dist/  (index.html / config.html)
+npm run lint       # eslint (TypeScript + .astro)
 npm run check      # astro check (types)
 npm test           # vitest: protocol unit tests + headless UI integration tests
 ```
+
+CI runs lint, type-check, tests and the build for every pull request
+(`.github/workflows/ci.yml`); the Pages workflow runs the same checks before deploying.
 
 `BASE_PATH` and `SITE_URL` configure the Pages base path; the deploy workflow derives them from
 the repository name, so nothing is hard-coded.
@@ -71,6 +75,7 @@ in-memory mock device that reproduces the protocol's write semantics.
 - `src/lib/ui/` — i18n (ja/en), small DOM helpers, and the connection controller.
 - `src/pages/` — the two Astro pages; `src/scripts/` holds their client-side entry points.
 - `tests/` — protocol unit tests, the device-table resolver, and headless UI tests.
+- `eslint.config.js` — flat ESLint config (typescript-eslint + eslint-plugin-astro).
 
 ## 日本語
 
