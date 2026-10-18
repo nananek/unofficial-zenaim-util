@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url } from '../lib/site';
+
+const configHref = url('config.html');
+---
+
+<BaseLayout
+  title="ZENAIM KEYBOARD 非公式 WebHID コンフィギュレータ"
+  description="Unofficial WebHID configurator for the ZENAIM KEYBOARD (KB007 / KB011 series). Configure actuation points and lighting from your browser."
+  active="home"
+>
+  <section class="hero">
+    <span class="badge" data-i18n="app.unofficial"></span>
+    <h1 data-i18n="index.hero.title"></h1>
+    <p class="lead" data-i18n="index.hero.lead"></p>
+    <div class="button-row">
+      <a class="button primary" href={configHref} data-i18n="index.cta.open"></a>
+      <a class="button" href={`${configHref}?demo=1`} data-i18n="index.cta.demo"></a>
+    </div>
+    <p class="small muted" data-i18n="index.hero.note"></p>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="index.connect.title"></h2>
+    <p data-i18n="index.connect.body"></p>
+    <div class="button-row">
+      <button type="button" id="connect-button" class="primary" data-i18n="index.cta.connect"></button>
+      <button type="button" id="demo-button" data-i18n="connect.demo"></button>
+    </div>
+    <p id="connect-status" class="status"></p>
+    <p class="small muted" data-i18n="index.connect.hint"></p>
+    <p id="unsupported" class="notice warn" data-i18n="connect.unsupported" hidden></p>
+    <div id="device-info-slot"></div>
+  </section>
+
+  <h2 data-i18n="index.features.title"></h2>
+  <div class="grid cols-3">
+    <div class="card">
+      <h3 data-i18n="index.feature.ap.title"></h3>
+      <p data-i18n="index.feature.ap.body"></p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="index.feature.light.title"></h3>
+      <p data-i18n="index.feature.light.body"></p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="index.feature.backup.title"></h3>
+      <p data-i18n="index.feature.backup.body"></p>
+    </div>
+  </div>
+
+  <h2 data-i18n="index.requirements.title"></h2>
+  <div class="card">
+    <ul>
+      <li data-i18n="index.requirements.browser"></li>
+      <li data-i18n="index.requirements.https"></li>
+      <li data-i18n="index.requirements.os"></li>
+    </ul>
+  </div>
+
+  <h2 data-i18n="index.scope.title"></h2>
+  <div class="card">
+    <p data-i18n="index.scope.body"></p>
+  </div>
+
+  <h2 data-i18n="index.docs.title"></h2>
+  <div class="card">
+    <p data-i18n="index.docs.body"></p>
+    <a class="button" href="https://github.com/nananek/unofficial-zenaim-util/blob/main/docs/protocol.md" rel="noopener"
+      data-i18n="index.docs.link"></a>
+  </div>
+</BaseLayout>
+
+<script>
+  import '../scripts/index-app';
+</script>
+
+<style>
+  .hero {
+    padding: 1.5rem 0 2rem;
+  }
+
+  .hero .lead {
+    max-width: 46rem;
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+</style>
