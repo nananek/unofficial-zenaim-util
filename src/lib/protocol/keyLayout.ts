@@ -6,6 +6,9 @@
  * around the wide keys and hold no key, so a device index maps either to a key
  * name or to `null`. Esc is device index 0 and Space is device index 96; both
  * were confirmed on hardware.
+ *
+ * Names are the US keycap legends, so a few differ from the internal
+ * identifiers the firmware uses (for example `E/J` prints as a backtick).
  */
 
 import type { DeviceProperty } from './deviceProperties';
@@ -40,21 +43,21 @@ const APP_KEY_RUNS: readonly AppKeyRun[] = [
   { start: 85, end: 88, space: 0 },
 ];
 
-/** Key names in app key index order (0..88). */
+/** US keycap legends in app key index order (0..88). */
 const APP_KEY_NAMES = [
   // index 0-17
   'Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
   'lock', 'clip', 'mem1', 'mem2', 'mem3',
   // index 18-31
-  'E/J', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '~', 'BS',
+  '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'BS',
   // index 32-34
   'Ins', 'Home', 'PgUp',
   // index 35-48
-  'TAB', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '@', '[', ']',
+  'TAB', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\',
   // index 49-51
   'Del', 'End', 'PgDn',
   // index 52-64
-  'Caps', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', ':', 'ENTER',
+  'Caps', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', 'ENTER',
   // index 65-77
   'SHIFT', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 'RSHIFT', '↑',
   // index 78-88

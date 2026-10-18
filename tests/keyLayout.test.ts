@@ -17,6 +17,14 @@ describe('ZK1 80US key names', () => {
     expect(names?.[72]).toBe('SHIFT');
     expect(names?.[85]).toBe('RSHIFT');
     expect(names?.[96]).toBe('Space');
+    // Symbol keys print the US keycap legend instead of the internal identifier.
+    expect(names?.[18]).toBe('`');
+    expect(names?.[30]).toBe('=');
+    expect(names?.[48]).toBe('[');
+    expect(names?.[49]).toBe(']');
+    expect(names?.[50]).toBe('\\');
+    expect(names?.[65]).toBe(';');
+    expect(names?.[66]).toBe("'");
     expect(names?.filter((name) => name === null)).toHaveLength(19);
     expect(names?.filter((name) => name !== null)).toHaveLength(89);
   });

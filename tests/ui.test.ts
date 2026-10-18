@@ -83,6 +83,8 @@ describe('configurator UI (demo mode)', () => {
     expect((cells[0] as HTMLButtonElement).getAttribute('aria-label')).toContain('R1 C1');
     expect((cells[31] as HTMLButtonElement).textContent).toBe('#32');
     expect((cells[96] as HTMLButtonElement).textContent).toBe('Space');
+    expect((cells[30] as HTMLButtonElement).textContent).toBe('=');
+    expect((cells[66] as HTMLButtonElement).textContent).toBe("'");
     const footnote = document.querySelector('.keymap-footnote')?.textContent;
     expect(footnote).toContain('ZK1 80US');
     expect(footnote).toContain('remapping');
