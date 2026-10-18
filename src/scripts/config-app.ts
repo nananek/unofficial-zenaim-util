@@ -239,11 +239,17 @@ function renderActuation(): HTMLElement {
   });
 
   const body: Child[] = [
-    h('h2', { text: t('actuation.title') }),
-    h('p', { class: 'muted', text: t('actuation.body') }),
+    h('div', { class: 'section-heading' },
+      h('div', null,
+        h('p', { class: 'eyebrow', text: t('actuation.eyebrow') }),
+        h('h2', { text: t('actuation.title') }),
+        h('p', { class: 'muted', text: t('actuation.body') }),
+      ),
+      state.apDirty ? h('span', { class: 'config-chip is-dirty', text: t('actuation.dirty') }) : h('span', { class: 'config-chip', text: property.series }),
+    ),
     h(
       'div',
-      { class: 'field-row' },
+      { class: 'control-bar' },
       h('label', { class: 'small muted', text: t('actuation.profile') }),
       profileSelect,
       h('button', {
@@ -260,7 +266,7 @@ function renderActuation(): HTMLElement {
         h('span', { text: t('actuation.enable') }),
       ),
     ),
-    h('p', { class: 'small muted', text: t('actuation.enable.hint') }),
+    h('p', { class: 'small muted inline-hint', text: t('actuation.enable.hint') }),
   ];
 
   if (!state.apLoaded) {
@@ -269,34 +275,50 @@ function renderActuation(): HTMLElement {
   }
 
   body.push(
-    h('h3', { text: t('actuation.grid') }),
-    h('p', { class: 'small muted', text: t('actuation.hint') }),
-    renderKeyGrid(),
-    h('h3', { text: t('actuation.selected') }),
-    renderPointEditor(),
-    h(
-      'div',
-      { class: 'button-row' },
+    h('div', { class: 'actuation-layout' },
+      h('section', { class: 'keymap-panel' },
+        h('div', { class: 'panel-heading' },
+          h('div', null,
+            h('h3', { text: t('actuation.grid') }),
+            h('p', { class: 'small muted', text: t('actuation.positionHint') }),
+          ),
+          h('span', { class: 'badge', text: t('actuation.keyCount', { count: state.apPoints.length }) }),
+        ),
+        renderKeyGrid(),
+        h('p', { class: 'keymap-footnote', text: t('actuation.mappingNote') }),
+      ),
+      h('aside', { class: 'editor-panel' },
+        h('div', { class: 'panel-heading' },
+          h('div', null,
+            h('p', { class: 'eyebrow', text: t('actuation.editor') }),
+            h('h3', { text: t('actuation.selected') }),
+          ),
+        ),
+        renderPointEditor(),
+      ),
+    ),
+    h('div', { class: 'actuation-actions' },
+      h('div', { class: 'button-row' },
+        h('button', {
+          type: 'button',
+          text: t('actuation.applyAll'),
+          disabled: state.apSelected === null,
+          onclick: () => applySelectedToAllKeys(),
+        }),
+        h('button', {
+          type: 'button',
+          text: t('actuation.defaults'),
+          onclick: () => resetToDefaults(),
+        }),
+      ),
       h('button', {
         type: 'button',
-        text: t('actuation.applyAll'),
-        disabled: state.apSelected === null,
-        onclick: () => applySelectedToAllKeys(),
-      }),
-      h('button', {
-        type: 'button',
-        text: t('actuation.defaults'),
-        onclick: () => resetToDefaults(),
-      }),
-      h('button', {
-        type: 'button',
-        class: 'primary',
+        class: 'primary save-button',
         text: t('actuation.write'),
         onclick: () => void writeActuation(),
       }),
     ),
   );
-  if (state.apDirty) body.push(h('p', { class: 'small', text: t('actuation.dirty') }));
   return h('div', { class: 'card' }, ...body) as HTMLElement;
 }
 
@@ -315,8 +337,9 @@ function renderKeyGrid(): HTMLElement {
         type: 'button',
         class: `key-cell${state.apSelected === index ? ' is-selected' : ''}`,
         dataset: { index: String(index) },
-        title: `R${row}C${column}: ${point.pointOn} / ${point.pointOff} µm`,
-        text: String(index + 1),
+        title: t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn }),
+        'aria-label': t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn }),
+        text: `#${String(index + 1).padStart(2, '0')}`,
         style: { backgroundColor: thresholdColor(point.pointOn, property.actuationDistance) },
         onclick: () => {
           state.apSelected = index;
@@ -336,7 +359,8 @@ function refreshCell(index: number): void {
   if (!cell) return;
   const row = Math.floor(index / property.columns) + 1;
   const column = (index % property.columns) + 1;
-  cell.title = `R${row}C${column}: ${point.pointOn} / ${point.pointOff} µm`;
+  cell.title = t('actuation.cellTitle', { index: index + 1, row, column, value: point.pointOn });
+  cell.setAttribute('aria-label', cell.title);
   cell.style.backgroundColor = thresholdColor(point.pointOn, property.actuationDistance);
 }
 
@@ -353,7 +377,13 @@ function renderPointEditor(): HTMLElement {
   return h(
     'div',
     null,
-    h('p', { class: 'small muted', text: `#${index + 1} (R${row}C${column})` }),
+    h('div', { class: 'selected-key-card' },
+      h('span', { class: 'selected-key-id', text: `#${String(index + 1).padStart(2, '0')}` }),
+      h('div', null,
+        h('strong', { text: t('actuation.position', { row, column }) }),
+        h('span', { class: 'small muted', text: t('actuation.noKeymap') }),
+      ),
+    ),
     pointField(t('actuation.pointOn'), point.pointOn, max, (value) => {
       point.pointOn = value;
       state.apDirty = true;

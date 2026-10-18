@@ -76,6 +76,10 @@ describe('configurator UI (demo mode)', () => {
       return found.length === 108 ? found : null;
     });
     expect(cells).toHaveLength(108);
+    expect((cells[0] as HTMLButtonElement).textContent).toBe('#01');
+    expect((cells[0] as HTMLButtonElement).getAttribute('aria-label')).toContain('R1 C1');
+    expect(document.querySelector('.keymap-footnote')?.textContent).toContain('key remapping are not available');
+    expect(document.querySelector('.selected-key-card')?.textContent).toContain('Matrix R1 · C1');
 
     // Editing a key updates the selected cell only (no full re-render).
     (cells[5] as HTMLButtonElement).click();
