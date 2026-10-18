@@ -29,6 +29,13 @@ export class ReportQueue {
     timer: ReturnType<typeof setTimeout>;
   }> = [];
 
+  /**
+   * Commands are serialised, so at most a couple of replies ever need buffering.
+   * The cap keeps a device that floods input reports from growing the queue (and
+   * the heap) without bound; the oldest reports are dropped first.
+   */
+  constructor(private readonly maxSize = 64) {}
+
   push(report: Uint8Array): void {
     const waiter = this.waiters.shift();
     if (waiter) {
@@ -36,6 +43,9 @@ export class ReportQueue {
       waiter.resolve(report);
     } else {
       this.queue.push(report);
+      if (this.queue.length > this.maxSize) {
+        this.queue.splice(0, this.queue.length - this.maxSize);
+      }
     }
   }
 

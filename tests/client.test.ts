@@ -11,7 +11,7 @@ import {
 } from '../src/lib/protocol/errors';
 import { encodeFrame, REPORT_SIZE } from '../src/lib/protocol/frame';
 import { ReportQueue, type HidTransport } from '../src/lib/protocol/transport';
-import { LIGHTING_PARAMS_SIZE } from '../src/lib/protocol/enums';
+import { LIGHTING_PARAMS_SIZE, PROFILE_COUNT } from '../src/lib/protocol/enums';
 
 const property80 = pickDeviceProperty({ vendorId: ZENAIM_VENDOR_ID, productId: 0x0003, bcdDevice: 0x0100 })!;
 
@@ -108,8 +108,12 @@ describe('actuation point write sequence (§6.1)', () => {
   it('reports mismatches when the device does not take the values', async () => {
     class StubbornDevice extends MockDevice {
       override handle(frame: Uint8Array): number[] {
-        // Swallow AllSet: staging never happens, so the read-back keeps the old values.
-        if (frame[0] === Cmd.ActuationPointAllSet) return [Cmd.ActuationPointAllSet];
+        // Accept the write and echo the header, but do not store it, so the
+        // read-back keeps the old values.
+        if (frame[0] === Cmd.ActuationPointAllSet) {
+          const size = frame[3] ?? 0;
+          return Array.from(frame.subarray(0, 4 + size));
+        }
         return super.handle(frame);
       }
     }
@@ -189,6 +193,69 @@ describe('error handling', () => {
     await expect(client.protocolVersionGet()).rejects.toThrow(ProtocolError);
   });
 });
+
+describe('bounds validation', () => {
+  it('rejects a buffer offset that does not fit the 16-bit wire field', async () => {
+    const { client, transport } = setup();
+    // 200 * 512 = 102400, which would wrap to 36864 if it were masked.
+    await expect(client.lightingSet(200, new Uint8Array(LIGHTING_PARAMS_SIZE))).rejects.toThrow(
+      ProtocolError,
+    );
+    expect(transport.sentFrames.some((frame) => frame[0] === Cmd.RGBLightingSet)).toBe(false);
+  });
+
+  it('rejects an out-of-range profile index', async () => {
+    const { client } = setup();
+    const params = new Uint8Array(LIGHTING_PARAMS_SIZE);
+    await expect(client.lightingSet(PROFILE_COUNT, params)).rejects.toThrow(ProtocolError);
+    await expect(client.lightingGet(PROFILE_COUNT)).rejects.toThrow(ProtocolError);
+    await expect(client.actuationPointsGet(PROFILE_COUNT, property80)).rejects.toThrow(ProtocolError);
+    await expect(
+      client.actuationPointsSet(PROFILE_COUNT, samplePoints(property80.keyCount), property80),
+    ).rejects.toThrow(ProtocolError);
+  });
+
+  it('rejects a reply that echoes an offset we did not ask for', async () => {
+    const client = new ZaneimClient(new OffsetLiarTransport(new MockDevice(property80)));
+    await expect(client.lightingGet(0)).rejects.toThrow(ProtocolError);
+  });
+});
+
+describe('ReportQueue', () => {
+  it('stays bounded when a device floods reports with no consumer', () => {
+    const queue = new ReportQueue();
+    for (let i = 0; i < 1000; i++) queue.push(new Uint8Array(32));
+    const buffered = (queue as unknown as { queue: Uint8Array[] }).queue.length;
+    expect(buffered).toBeLessThanOrEqual(64);
+  });
+});
+
+/** A transport whose replies always echo a different offset than requested. */
+class OffsetLiarTransport implements HidTransport {
+  readonly label = 'liar';
+  readonly usb = {
+    vendorId: ZENAIM_VENDOR_ID,
+    productId: property80.productId,
+    bcdDevice: property80.bcdDevice,
+  };
+  private readonly queue = new ReportQueue();
+
+  constructor(private readonly device: MockDevice) {}
+
+  async send(frame: Uint8Array): Promise<void> {
+    const response = this.device.handle(frame);
+    if (response.length >= 4) response[1] = ((response[1] ?? 0) + 1) & 0xff;
+    this.queue.push(encodeFrame(response));
+  }
+
+  receive(timeoutMs: number): Promise<Uint8Array> {
+    return this.queue.shift(timeoutMs, () => new TimeoutError('liar transport timed out'));
+  }
+
+  async close(): Promise<void> {
+    this.queue.clear();
+  }
+}
 
 /** Sends one CRC-corrupt report before the real one to exercise the retry path. */
 class FlakyTransport implements HidTransport {

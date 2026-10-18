@@ -88,6 +88,55 @@ function chunkIndexes(size: number): Array<{ offset: number; size: number }> {
   return out;
 }
 
+/** The device is addressed with a 16-bit offset (docs/protocol.md §2.4). */
+const MAX_BUFFER_OFFSET = 0xffff;
+
+/**
+ * Reject any access that would not fit the 16-bit wire offset. Masking the value
+ * instead would silently redirect the access to an unrelated region.
+ */
+function assertBufferRange(offset: number, size: number): void {
+  if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(size) || size < 0) {
+    throw new ProtocolError(`invalid buffer range: offset=${offset} size=${size}`);
+  }
+  const last = size > 0 ? offset + size - 1 : offset;
+  if (last > MAX_BUFFER_OFFSET) {
+    throw new ProtocolError(
+      `buffer range ${offset}..${last} does not fit the 16-bit device offset space (max ${MAX_BUFFER_OFFSET})`,
+    );
+  }
+}
+
+/**
+ * §2.3: buffer replies echo the offset and the size. A reply that echoes anything
+ * else belongs to another request (e.g. a late reply from a previous chunk), so it
+ * must not be accepted as this one's data.
+ */
+function assertBufferEcho(
+  response: Uint8Array,
+  expectedOffset: number,
+  expectedSize: number,
+  command: number,
+): void {
+  const echoedOffset = (response[1] ?? 0) | ((response[2] ?? 0) << 8);
+  const echoedSize = response[3] ?? -1;
+  if (echoedOffset !== expectedOffset || echoedSize !== expectedSize) {
+    throw new ProtocolError(
+      `buffer reply mismatch for 0x${command.toString(16).padStart(2, '0')}: ` +
+        `echo ${echoedOffset}/${echoedSize}, expected ${expectedOffset}/${expectedSize}`,
+    );
+  }
+}
+
+/** Profile-scoped data only exists for the documented 0..PROFILE_COUNT-1 (§4.1). */
+function assertProfile(profile: number): void {
+  if (!Number.isInteger(profile) || profile < 0 || profile >= PROFILE_COUNT) {
+    throw new ProtocolError(
+      `profile ${profile} is outside the documented 0..${PROFILE_COUNT - 1} range`,
+    );
+  }
+}
+
 export function decodeActuationPoints(bytes: Uint8Array): ActuationPoint[] {
   const points: ActuationPoint[] = [];
   for (let i = 0; i + 4 <= bytes.length; i += 4) {
@@ -167,6 +216,7 @@ export class ZaneimClient {
     size: number,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   ): Promise<Uint8Array> {
+    assertBufferRange(offset, size);
     const out = new Uint8Array(size);
     for (const chunk of chunkIndexes(size)) {
       const absolute = offset + chunk.offset;
@@ -175,11 +225,7 @@ export class ZaneimClient {
         command,
         timeoutMs,
       );
-      if (response[3] !== chunk.size) {
-        throw new ProtocolError(
-          `GetBuffer echo mismatch for 0x${command.toString(16)}: ${response[3]} != ${chunk.size}`,
-        );
-      }
+      assertBufferEcho(response, absolute, chunk.size, command);
       for (let i = 0; i < chunk.size; i++) out[chunk.offset + i] = response[4 + i] ?? 0;
     }
     return out;
@@ -192,11 +238,13 @@ export class ZaneimClient {
     data: Uint8Array,
     timeoutMs = WRITE_TIMEOUT_MS,
   ): Promise<void> {
+    assertBufferRange(offset, data.length);
     for (const chunk of chunkIndexes(data.length)) {
       const absolute = offset + chunk.offset;
       const commandBytes = [command, absolute & 0xff, (absolute >> 8) & 0xff, chunk.size];
       for (let i = 0; i < chunk.size; i++) commandBytes.push(data[chunk.offset + i] ?? 0);
-      await this.request(commandBytes, command, timeoutMs);
+      const response = await this.request(commandBytes, command, timeoutMs);
+      assertBufferEcho(response, absolute, chunk.size, command);
     }
   }
 
@@ -263,12 +311,14 @@ export class ZaneimClient {
   }
 
   async actuationPointsGet(profile: number, property: DeviceProperty): Promise<ActuationPoint[]> {
+    assertProfile(profile);
     const size = this.actuationPointBlockSize(property);
     const buffer = await this.getBuffer(Cmd.ActuationPointAllGet, profile * size, size, WRITE_TIMEOUT_MS);
     return decodeActuationPoints(buffer);
   }
 
   async actuationPointsSet(profile: number, points: readonly ActuationPoint[], property: DeviceProperty): Promise<void> {
+    assertProfile(profile);
     const size = this.actuationPointBlockSize(property);
     await this.setBuffer(
       Cmd.ActuationPointAllSet,
@@ -310,6 +360,7 @@ export class ZaneimClient {
   /* ------------------------------------------------------ §3.10 lighting */
 
   async lightingGet(profile: number): Promise<Uint8Array> {
+    assertProfile(profile);
     return this.getBuffer(
       Cmd.RGBLightingGet,
       profile * LIGHTING_PARAMS_SIZE,
@@ -319,6 +370,7 @@ export class ZaneimClient {
   }
 
   async lightingSet(profile: number, params: Uint8Array): Promise<void> {
+    assertProfile(profile);
     if (params.length !== LIGHTING_PARAMS_SIZE) {
       throw new ProtocolError(`lighting params must be ${LIGHTING_PARAMS_SIZE} bytes`);
     }

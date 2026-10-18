@@ -743,7 +743,10 @@ async function restoreFromFile(file: File): Promise<void> {
       state.ledLoaded = true;
     }
     if (Array.isArray(backup.lighting)) {
-      for (let profile = 0; profile < backup.lighting.length; profile++) {
+      // Ignore profiles the protocol does not define instead of writing past the
+      // documented 0..PROFILE_COUNT-1 range.
+      const profiles = Math.min(backup.lighting.length, PROFILE_COUNT);
+      for (let profile = 0; profile < profiles; profile++) {
         const params = backup.lighting[profile];
         if (!params || params.length !== LIGHTING_PARAMS_SIZE) continue;
         setBusyText(`${t('backup.restoring')} (lighting ${profile + 1})`);
@@ -754,6 +757,9 @@ async function restoreFromFile(file: File): Promise<void> {
     if (property && Array.isArray(backup.actuationPoints)) {
       for (const dump of backup.actuationPoints) {
         if (!dump?.points || dump.points.length !== property.keyCount) continue;
+        if (!Number.isInteger(dump.profile) || dump.profile < 0 || dump.profile >= PROFILE_COUNT) {
+          continue;
+        }
         setBusyText(`${t('backup.restoring')} (actuation ${dump.profile + 1})`);
         await snapshot.client.writeActuationPoints(dump.profile, dump.points, property);
       }

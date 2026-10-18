@@ -11,7 +11,8 @@ import tseslint from 'typescript-eslint';
  */
 export default [
   {
-    ignores: ['dist/', '.astro/', 'node_modules/', 'public/'],
+    // `.tmp/` holds scratch and audit output (including generated probes).
+    ignores: ['dist/', '.astro/', 'node_modules/', 'public/', '.tmp/'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
