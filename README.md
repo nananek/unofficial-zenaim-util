@@ -43,6 +43,9 @@ hardware**. Everything else is out of scope for this MVP:
 Unverified command families (keymap, macro, SOCD, MotionHack, …) are intentionally not
 implemented. Always take a backup before writing.
 
+The actuation grid shows key names on the ZK1 80US series (KB007 / KB011); other series keep
+the matrix position labels.
+
 Requirements: a WebHID-capable Chromium browser (Chrome / Edge / Opera) on an HTTPS or
 `localhost` context. Firefox and Safari do not implement WebHID.
 
@@ -96,6 +99,8 @@ WebHID コンフィギュレータは Astro 製の静的サイトで、GitHub Ac
 
 実機がない場合はデモモード (`config.html?demo=1`) で UI と書き込み手順を確認できます。
 UI は日本語 / 英語の切り替えに対応しています。
+
+アクチュエーショングリッドは ZK1 80US (KB007 / KB011) ではキー名、他のシリーズではマトリクス位置 (#NN) を表示します。
 
 ## License
 

@@ -3,6 +3,7 @@ import { renderDeviceInfo } from '../lib/ui/deviceInfo';
 import { clear, h, type Child } from '../lib/ui/dom';
 import { applyI18n, getLang, onLangChange, t } from '../lib/ui/i18n';
 import type { ActuationPoint, Backup, RgbLedConfig } from '../lib/protocol/client';
+import type { DeviceProperty } from '../lib/protocol/deviceProperties';
 import {
   LIGHTING_INDICATORS,
   LIGHTING_MODE_LABELS,
@@ -11,6 +12,7 @@ import {
   PROFILE_COUNT,
   PROFILE_LABELS,
 } from '../lib/protocol/enums';
+import { deviceKeyNames } from '../lib/protocol/keyLayout';
 
 type Tab = 'connect' | 'actuation' | 'lighting' | 'backup';
 
@@ -239,11 +241,17 @@ function renderActuation(): HTMLElement {
   });
 
   const body: Child[] = [
-    h('h2', { text: t('actuation.title') }),
-    h('p', { class: 'muted', text: t('actuation.body') }),
+    h('div', { class: 'section-heading' },
+      h('div', null,
+        h('p', { class: 'eyebrow', text: t('actuation.eyebrow') }),
+        h('h2', { text: t('actuation.title') }),
+        h('p', { class: 'muted', text: t('actuation.body') }),
+      ),
+      state.apDirty ? h('span', { class: 'config-chip is-dirty', text: t('actuation.dirty') }) : h('span', { class: 'config-chip', text: property.series }),
+    ),
     h(
       'div',
-      { class: 'field-row' },
+      { class: 'control-bar' },
       h('label', { class: 'small muted', text: t('actuation.profile') }),
       profileSelect,
       h('button', {
@@ -260,7 +268,7 @@ function renderActuation(): HTMLElement {
         h('span', { text: t('actuation.enable') }),
       ),
     ),
-    h('p', { class: 'small muted', text: t('actuation.enable.hint') }),
+    h('p', { class: 'small muted inline-hint', text: t('actuation.enable.hint') }),
   ];
 
   if (!state.apLoaded) {
@@ -269,54 +277,81 @@ function renderActuation(): HTMLElement {
   }
 
   body.push(
-    h('h3', { text: t('actuation.grid') }),
-    h('p', { class: 'small muted', text: t('actuation.hint') }),
-    renderKeyGrid(),
-    h('h3', { text: t('actuation.selected') }),
-    renderPointEditor(),
-    h(
-      'div',
-      { class: 'button-row' },
+    h('div', { class: 'actuation-layout' },
+      h('section', { class: 'keymap-panel' },
+        h('div', { class: 'panel-heading' },
+          h('div', null,
+            h('h3', { text: t('actuation.grid') }),
+            h('p', { class: 'small muted', text: t('actuation.positionHint') }),
+          ),
+          h('span', { class: 'badge', text: t('actuation.keyCount', { count: state.apPoints.length }) }),
+        ),
+        renderKeyGrid(),
+        h('p', { class: 'keymap-footnote', text: t('actuation.mappingNote') }),
+      ),
+      h('aside', { class: 'editor-panel' },
+        h('div', { class: 'panel-heading' },
+          h('div', null,
+            h('p', { class: 'eyebrow', text: t('actuation.editor') }),
+            h('h3', { text: t('actuation.selected') }),
+          ),
+        ),
+        renderPointEditor(),
+      ),
+    ),
+    h('div', { class: 'actuation-actions' },
+      h('div', { class: 'button-row' },
+        h('button', {
+          type: 'button',
+          text: t('actuation.applyAll'),
+          disabled: state.apSelected === null,
+          onclick: () => applySelectedToAllKeys(),
+        }),
+        h('button', {
+          type: 'button',
+          text: t('actuation.defaults'),
+          onclick: () => resetToDefaults(),
+        }),
+      ),
       h('button', {
         type: 'button',
-        text: t('actuation.applyAll'),
-        disabled: state.apSelected === null,
-        onclick: () => applySelectedToAllKeys(),
-      }),
-      h('button', {
-        type: 'button',
-        text: t('actuation.defaults'),
-        onclick: () => resetToDefaults(),
-      }),
-      h('button', {
-        type: 'button',
-        class: 'primary',
+        class: 'primary save-button',
         text: t('actuation.write'),
         onclick: () => void writeActuation(),
       }),
     ),
   );
-  if (state.apDirty) body.push(h('p', { class: 'small', text: t('actuation.dirty') }));
   return h('div', { class: 'card' }, ...body) as HTMLElement;
+}
+
+/** Grid cell label for a device index: the key name when known, else `#NN`. */
+function cellLabel(property: DeviceProperty, index: number, name: string | null, value: number): string {
+  const row = Math.floor(index / property.columns) + 1;
+  const column = (index % property.columns) + 1;
+  return name === null
+    ? t('actuation.cellTitle', { index: index + 1, row, column, value })
+    : t('actuation.cellTitleNamed', { name, row, column, value });
 }
 
 function renderKeyGrid(): HTMLElement {
   const property = connected()?.identity.property;
   if (!property) return h('div');
+  const names = deviceKeyNames(property);
   const grid = h('div', {
     class: 'key-grid',
     style: { gridTemplateColumns: `repeat(${property.columns}, minmax(0, 1fr))` },
   });
   state.apPoints.forEach((point, index) => {
-    const row = Math.floor(index / property.columns) + 1;
-    const column = (index % property.columns) + 1;
+    const name = names?.[index] ?? null;
+    const title = cellLabel(property, index, name, point.pointOn);
     grid.append(
       h('button', {
         type: 'button',
         class: `key-cell${state.apSelected === index ? ' is-selected' : ''}`,
         dataset: { index: String(index) },
-        title: `R${row}C${column}: ${point.pointOn} / ${point.pointOff} µm`,
-        text: String(index + 1),
+        title,
+        'aria-label': title,
+        text: name ?? `#${String(index + 1).padStart(2, '0')}`,
         style: { backgroundColor: thresholdColor(point.pointOn, property.actuationDistance) },
         onclick: () => {
           state.apSelected = index;
@@ -334,9 +369,9 @@ function refreshCell(index: number): void {
   if (!property || !point) return;
   const cell = root.querySelector<HTMLElement>(`.key-cell[data-index="${index}"]`);
   if (!cell) return;
-  const row = Math.floor(index / property.columns) + 1;
-  const column = (index % property.columns) + 1;
-  cell.title = `R${row}C${column}: ${point.pointOn} / ${point.pointOff} µm`;
+  const name = deviceKeyNames(property)?.[index] ?? null;
+  cell.title = cellLabel(property, index, name, point.pointOn);
+  cell.setAttribute('aria-label', cell.title);
   cell.style.backgroundColor = thresholdColor(point.pointOn, property.actuationDistance);
 }
 
@@ -350,10 +385,17 @@ function renderPointEditor(): HTMLElement {
   const max = property.actuationDistance;
   const row = Math.floor(index / property.columns) + 1;
   const column = (index % property.columns) + 1;
+  const name = deviceKeyNames(property)?.[index] ?? null;
   return h(
     'div',
     null,
-    h('p', { class: 'small muted', text: `#${index + 1} (R${row}C${column})` }),
+    h('div', { class: 'selected-key-card' },
+      h('span', { class: 'selected-key-id', text: `#${String(index + 1).padStart(2, '0')}` }),
+      h('div', null,
+        h('strong', { text: name ?? t('actuation.noKeyName') }),
+        h('span', { class: 'small muted', text: t('actuation.position', { row, column }) }),
+      ),
+    ),
     pointField(t('actuation.pointOn'), point.pointOn, max, (value) => {
       point.pointOn = value;
       state.apDirty = true;

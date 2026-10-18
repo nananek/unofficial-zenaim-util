@@ -64,7 +64,7 @@ describe('configurator UI (demo mode)', () => {
     expect(text).toContain('108');
   });
 
-  it('loads actuation points and renders one cell per key', async () => {
+  it('loads actuation points and renders one named cell per key', async () => {
     button('Try demo mode').click();
     await waitFor(() => document.querySelector('#device-info'));
 
@@ -77,12 +77,30 @@ describe('configurator UI (demo mode)', () => {
     });
     expect(cells).toHaveLength(108);
 
+    // ZK1 80US cells show key names; positions without a key keep the #NN label.
+    expect((cells[0] as HTMLButtonElement).textContent).toBe('Esc');
+    expect((cells[0] as HTMLButtonElement).getAttribute('aria-label')).toContain('Esc');
+    expect((cells[0] as HTMLButtonElement).getAttribute('aria-label')).toContain('R1 C1');
+    expect((cells[31] as HTMLButtonElement).textContent).toBe('#32');
+    expect((cells[96] as HTMLButtonElement).textContent).toBe('Space');
+    const footnote = document.querySelector('.keymap-footnote')?.textContent;
+    expect(footnote).toContain('ZK1 80US');
+    expect(footnote).toContain('remapping');
+
+    // The selected-key card pairs the key name with the matrix position.
+    document.querySelector<HTMLButtonElement>('.key-cell[data-index="0"]')!.click();
+    const card = document.querySelector('.selected-key-card')!;
+    expect(card.querySelector('strong')?.textContent).toBe('Esc');
+    expect(card.querySelector('.muted')?.textContent).toContain('Matrix R1 · C1');
+
     // Editing a key updates the selected cell only (no full re-render).
-    (cells[5] as HTMLButtonElement).click();
+    document.querySelector<HTMLButtonElement>('.key-cell[data-index="5"]')!.click();
     const range = document.querySelector<HTMLInputElement>('.field input[type="range"]')!;
     range.value = '900';
     range.dispatchEvent(new Event('input'));
-    expect(document.querySelector('.key-cell.is-selected')?.getAttribute('title')).toContain('900');
+    const selected = document.querySelector('.key-cell.is-selected');
+    expect(selected?.getAttribute('title')).toContain('F5');
+    expect(selected?.getAttribute('title')).toContain('900');
   });
 
   it('writes actuation points and reports a successful verify', async () => {

@@ -7,8 +7,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   description="Read and write actuation points, lighting and LED settings on the ZENAIM KEYBOARD from your browser over WebHID."
   active="config"
 >
-  <h1 data-i18n="config.title"></h1>
-  <p class="small muted" data-i18n="index.scope.body"></p>
+  <section class="config-hero">
+    <div>
+      <p class="eyebrow" data-i18n="config.eyebrow"></p>
+      <h1 data-i18n="config.title"></h1>
+      <p class="config-lead" data-i18n="config.lead"></p>
+    </div>
+    <span class="config-chip"><span class="live-dot"></span><span data-i18n="config.local"></span></span>
+  </section>
   <div id="config-root"></div>
   <div id="overlay-slot"></div>
 </BaseLayout>
