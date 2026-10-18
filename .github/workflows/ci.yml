@@ -10,6 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Guard against machine-local registry URLs in the lockfile
+        run: |
+          if grep -nE '127\.0\.0\.1|localhost' package-lock.json; then
+            echo "::error::package-lock.json contains a machine-local registry URL."
+            echo "Regenerate the lockfile against the public npm registry before committing."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v5
         with:
           node-version: 24

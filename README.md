@@ -59,6 +59,8 @@ npm test           # vitest: protocol unit tests + headless UI integration tests
 
 CI runs lint, type-check, tests and the build for every pull request
 (`.github/workflows/ci.yml`); the Pages workflow runs the same checks before deploying.
+`package-lock.json` must reference the public npm registry (`https://registry.npmjs.org/`);
+the workflows reject a lockfile pinned to a local mirror before installing.
 
 `BASE_PATH` and `SITE_URL` configure the Pages base path; the deploy workflow derives them from
 the repository name, so nothing is hard-coded.
