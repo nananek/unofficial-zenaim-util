@@ -95,6 +95,9 @@ export const Cmd = {
   LoggingConfigGet: 0xae,
   LoggingConfigSet: 0xaf,
 
+  // §3.20 Actuation distance with switch state (read-only live samples)
+  ActuationDistanceWithSwitchStateAllGet: 0xcb,
+
   // §3.22 Actuation user config (protocol v2+)
   ActuationUserConfigGet: 0xd4,
   ActuationUserConfigSet: 0xd5,

@@ -1,7 +1,7 @@
 import { clear } from '../lib/ui/dom';
 import { Connection, connectionStatus, describeError } from '../lib/ui/connection';
 import { renderDeviceInfo } from '../lib/ui/deviceInfo';
-import { onLangChange, t } from '../lib/ui/i18n';
+import { applyI18n, onLangChange, t } from '../lib/ui/i18n';
 
 const connection = new Connection();
 
@@ -12,6 +12,7 @@ const demoButton = document.querySelector<HTMLButtonElement>('#demo-button');
 const unsupported = document.querySelector<HTMLElement>('#unsupported');
 
 function render(): void {
+  applyI18n(document);
   const state = connection.current;
 
   if (statusEl) {
