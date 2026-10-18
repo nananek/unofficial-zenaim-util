@@ -1,0 +1,12 @@
+# dependencies / build output
+node_modules/
+dist/
+*.log
+
+# local scratch
+.tmp/
+.env
+.env.local
+
+# editor / OS
+.DS_Store
